@@ -1,0 +1,5 @@
+.venv/
+__pycache__/
+*.pyc
+data/mood_app.db
+.streamlit/secrets.toml
