@@ -7,20 +7,25 @@ import streamlit as st
 ALLOWED_SCOPES = {"all", "self", "friend"}
 
 
+def _normalize_scope(value: object) -> str:
+    text = str(value).strip().lower()
+    return text.strip("\"'")
+
+
 def get_app_scope() -> str:
     """APP_SCOPE(環境変数/Secrets)から公開スコープを取得する。"""
-    scope = os.getenv("APP_SCOPE", "").strip()
+    # Community CloudではSecrets指定を優先し、環境変数はフォールバックで使う。
+    try:
+        secret_scope = _normalize_scope(st.secrets.get("APP_SCOPE", ""))
+    except Exception:
+        secret_scope = ""
 
-    if not scope:
-        try:
-            raw_secret = st.secrets.get("APP_SCOPE", "")
-            scope = str(raw_secret).strip()
-        except Exception:
-            scope = ""
+    if secret_scope in ALLOWED_SCOPES:
+        return secret_scope
 
-    scope = scope.lower()
-    if scope in ALLOWED_SCOPES:
-        return scope
+    env_scope = _normalize_scope(os.getenv("APP_SCOPE", ""))
+    if env_scope in ALLOWED_SCOPES:
+        return env_scope
 
     return "all"
 
