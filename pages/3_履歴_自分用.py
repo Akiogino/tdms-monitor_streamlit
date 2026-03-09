@@ -6,10 +6,9 @@ import streamlit as st
 from utils.db import CSV_EXPORT_COLUMNS, fetch_responses, init_db
 from utils.diagram import create_score_timeseries_figure
 from utils.navigation import render_sidebar_navigation
-from utils.scope import enforce_user_scope, get_app_scope
 
 USER_TYPE = "self"
-PAGE_NAME = "履歴（自分用）"
+PAGE_NAME = "履歴（秋山用）"
 DISPLAY_COLUMNS = [
     "created_at",
     "context_text",
@@ -48,10 +47,8 @@ def build_csv(df: pd.DataFrame) -> bytes:
 
 
 def main() -> None:
-    scope = get_app_scope()
     init_db()
-    render_sidebar_navigation(scope)
-    enforce_user_scope(scope, USER_TYPE)
+    render_sidebar_navigation()
 
     inject_page_css()
     render_header()
@@ -77,7 +74,7 @@ def main() -> None:
     st.download_button(
         "CSVダウンロード",
         data=build_csv(df),
-        file_name="mood_self_history.csv",
+        file_name="mood_akiyama_history.csv",
         mime="text/csv",
         width="stretch",
     )

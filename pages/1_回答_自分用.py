@@ -12,10 +12,9 @@ from utils.scoring import (
     calculate_scores,
     validate_answers,
 )
-from utils.scope import enforce_user_scope, get_app_scope
 
 USER_TYPE = "self"
-PAGE_NAME = "回答（自分用）"
+PAGE_NAME = "回答（秋山用）"
 
 
 def inject_page_css() -> None:
@@ -63,7 +62,7 @@ def render_legend() -> None:
 
 
 def render_form() -> tuple[bool, str, dict[str, object], str]:
-    with st.form("self_response_form", clear_on_submit=True):
+    with st.form("akiyama_response_form", clear_on_submit=True):
         context_text = st.text_input(
             "状況（任意）",
             placeholder="例: 運動を始める前、仕事のあと",
@@ -164,10 +163,8 @@ def render_latest_result() -> None:
 
 
 def main() -> None:
-    scope = get_app_scope()
     init_db()
-    render_sidebar_navigation(scope)
-    enforce_user_scope(scope, USER_TYPE)
+    render_sidebar_navigation()
 
     inject_page_css()
     render_header()
