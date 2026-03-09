@@ -168,6 +168,7 @@ def save_response(
     )
 
     report_text = build_line_report_text(
+        responder_label="秋山",
         created_at=created_at,
         context_text=context_text,
         free_text=free_text,

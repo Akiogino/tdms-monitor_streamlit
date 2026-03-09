@@ -93,6 +93,7 @@ def build_score_report(
 
 
 def build_line_report_text(
+    responder_label: str,
     created_at: str,
     context_text: str,
     free_text: str,
@@ -116,6 +117,7 @@ def build_line_report_text(
 
     return (
         "【二次元気分尺度】\n"
+        f"回答者: {responder_label}\n"
         f"日時: {timestamp}\n"
         f"状況: {context}\n"
         f"メモ: {memo}\n"
