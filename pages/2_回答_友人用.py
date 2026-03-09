@@ -5,7 +5,13 @@ import streamlit as st
 from utils.db import fetch_responses, init_db, insert_response
 from utils.diagram import create_mood_diagram
 from utils.navigation import render_sidebar_navigation
-from utils.scoring import QUESTION_ITEMS, SCALE_LABELS, calculate_scores, validate_answers
+from utils.scoring import (
+    QUESTION_ITEMS,
+    SCALE_LABELS,
+    build_score_report,
+    calculate_scores,
+    validate_answers,
+)
 from utils.scope import enforce_user_scope, get_app_scope
 
 USER_TYPE = "friend"
@@ -126,24 +132,32 @@ def render_latest_result() -> None:
         return
 
     latest = latest_df.iloc[0]
-    st.write(f"日時: {display_text(latest['created_at'])}")
     st.write(f"状況: {display_text(latest['context_text'])}")
-    st.write(
-        f"V: {int(latest['score_v'])} / S: {int(latest['score_s'])} / "
-        f"P: {int(latest['score_p'])} / A: {int(latest['score_a'])}"
-    )
+    score_v = int(latest["score_v"])
+    score_s = int(latest["score_s"])
+    score_p = int(latest["score_p"])
+    score_a = int(latest["score_a"])
 
     recent_vs = [
         (int(row["score_v"]), int(row["score_s"]))
         for _, row in latest_df.iloc[1:6].iterrows()
     ]
 
-    figure = create_mood_diagram(
-        score_v=int(latest["score_v"]),
-        score_s=int(latest["score_s"]),
-        recent_vs=recent_vs,
+    figure = create_mood_diagram(score_v=score_v, score_s=score_s, recent_vs=recent_vs)
+    report_text = build_score_report(
+        created_at=display_text(latest["created_at"]),
+        score_v=score_v,
+        score_s=score_s,
+        score_p=score_p,
+        score_a=score_a,
     )
-    st.plotly_chart(figure, width="stretch", config={"displayModeBar": False})
+
+    col_chart, col_report = st.columns([1.8, 1.2])
+    with col_chart:
+        st.plotly_chart(figure, width="stretch", config={"displayModeBar": False})
+    with col_report:
+        st.markdown("**因子得点**")
+        st.text(report_text)
 
     st.markdown("**自由記述**")
     st.write(display_text(latest["free_text"]))

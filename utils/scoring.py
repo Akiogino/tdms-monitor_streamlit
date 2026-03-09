@@ -58,3 +58,35 @@ def calculate_scores(answers: Mapping[str, int]) -> dict[str, int]:
         "score_p": int(p),
         "score_a": int(a),
     }
+
+
+def _score_phrase(value: int, positive: str, negative: str, neutral: str) -> str:
+    if value > 0:
+        return positive
+    if value < 0:
+        return negative
+    return neutral
+
+
+def build_score_report(
+    created_at: str,
+    score_v: int,
+    score_s: int,
+    score_p: int,
+    score_a: int,
+) -> str:
+    """採点値と簡易評価を1つのテキストに整形する。"""
+    evaluations = [
+        _score_phrase(score_v, "活力は十分。", "やや疲労傾向。", "活力は平均的。"),
+        _score_phrase(score_s, "情緒は安定。", "緊張気味。", "情緒は中間。"),
+        _score_phrase(score_p, "気分は明るめ。", "気分は落ち込み気味。", "気分はニュートラル。"),
+        _score_phrase(score_a, "覚醒度は高め。", "やや眠気傾向。", "覚醒度は標準。"),
+    ]
+
+    return (
+        f"【タイムスタンプ】\n{created_at}\n\n"
+        f"【数値】\n"
+        f"活性度：{score_v}｜安定度：{score_s}｜快適度：{score_p}｜覚醒度：{score_a}\n\n"
+        f"【評価】\n"
+        f"{''.join(evaluations)}"
+    )
