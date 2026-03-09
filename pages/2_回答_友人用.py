@@ -1,17 +1,30 @@
 from __future__ import annotations
 
+import logging
+from datetime import datetime
+
 import streamlit as st
 
-from utils.db import fetch_responses, init_db, insert_response
+from utils.db import fetch_recent_vs_points, fetch_responses, init_db, insert_response
 from utils.diagram import create_mood_diagram
+from utils.image_hosting import (
+    build_public_id,
+    fig_to_png_bytes,
+    get_cloudinary_state,
+    upload_png_bytes_to_cloudinary,
+)
+from utils.line_messaging import get_line_push_state, push_report
 from utils.navigation import render_sidebar_navigation
 from utils.scoring import (
     QUESTION_ITEMS,
     SCALE_LABELS,
+    build_line_report_text,
     build_score_report,
     calculate_scores,
     validate_answers,
 )
+
+logger = logging.getLogger(__name__)
 
 USER_TYPE = "friend"
 PAGE_NAME = "回答（明石用）"
@@ -61,7 +74,17 @@ def render_legend() -> None:
     )
 
 
-def render_form() -> tuple[bool, str, dict[str, object], str]:
+def render_form(
+    line_ready: bool,
+    line_message: str,
+    cloudinary_ready: bool,
+    cloudinary_message: str,
+) -> tuple[bool, str, dict[str, object], str, bool]:
+    if not line_ready:
+        st.warning(f"LINE送信は無効です: {line_message}")
+    elif not cloudinary_ready:
+        st.info(f"画像送信は無効です（テキストのみ送信）: {cloudinary_message}")
+
     with st.form("akashi_response_form", clear_on_submit=True):
         context_text = st.text_input(
             "状況（任意）",
@@ -87,9 +110,15 @@ def render_form() -> tuple[bool, str, dict[str, object], str]:
             height=120,
         )
 
+        send_to_line = st.toggle(
+            "送信後にLINEへレポート送信",
+            value=line_ready,
+            disabled=not line_ready,
+        )
+
         submitted = st.form_submit_button("保存する", width="stretch")
 
-    return submitted, context_text.strip(), answers, free_text.strip()
+    return submitted, context_text.strip(), answers, free_text.strip(), bool(send_to_line)
 
 
 def save_response(
@@ -97,6 +126,8 @@ def save_response(
     context_text: str,
     answers: dict[str, object],
     free_text: str,
+    send_to_line: bool,
+    cloudinary_ready: bool,
 ) -> None:
     if not submitted:
         return
@@ -109,6 +140,9 @@ def save_response(
     typed_answers = {key: int(answers[key]) for key, _ in QUESTION_ITEMS}
     scores = calculate_scores(typed_answers)
 
+    # 保存前の直近点を薄い履歴点として使う。
+    history_vs = fetch_recent_vs_points(user_type=USER_TYPE, limit=5)
+
     insert_response(
         user_type=USER_TYPE,
         context_text=context_text,
@@ -118,6 +152,48 @@ def save_response(
     )
 
     st.success("保存しました")
+
+    if not send_to_line:
+        return
+
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    latest_df = fetch_responses(user_type=USER_TYPE, limit=1)
+    if not latest_df.empty:
+        created_at = str(latest_df.iloc[0]["created_at"])
+
+    figure = create_mood_diagram(
+        score_v=scores["score_v"],
+        score_s=scores["score_s"],
+        recent_vs=history_vs,
+    )
+
+    report_text = build_line_report_text(
+        created_at=created_at,
+        context_text=context_text,
+        free_text=free_text,
+        score_v=scores["score_v"],
+        score_s=scores["score_s"],
+        score_p=scores["score_p"],
+        score_a=scores["score_a"],
+    )
+
+    image_url: str | None = None
+    if cloudinary_ready:
+        try:
+            png_bytes = fig_to_png_bytes(figure)
+            public_id = build_public_id(USER_TYPE)
+            image_url = upload_png_bytes_to_cloudinary(png_bytes=png_bytes, public_id=public_id)
+        except Exception as exc:
+            logger.exception("Cloudinary upload failed for %s", USER_TYPE)
+            st.warning(
+                f"ダイアグラム画像の送信に失敗したため、LINEへはテキストのみ送信します。詳細: {exc}"
+            )
+
+    sent, message = push_report(user_type=USER_TYPE, image_url=image_url, report_text=report_text)
+    if sent:
+        st.toast("LINEにレポートを送信しました。")
+    else:
+        st.warning(f"LINE送信に失敗しました: {message}")
 
 
 def render_latest_result() -> None:
@@ -169,8 +245,23 @@ def main() -> None:
     inject_page_css()
     render_header()
 
-    submitted, context_text, answers, free_text = render_form()
-    save_response(submitted, context_text, answers, free_text)
+    line_ready, line_message = get_line_push_state(USER_TYPE)
+    cloudinary_ready, cloudinary_message = get_cloudinary_state()
+
+    submitted, context_text, answers, free_text, send_to_line = render_form(
+        line_ready=line_ready,
+        line_message=line_message,
+        cloudinary_ready=cloudinary_ready,
+        cloudinary_message=cloudinary_message,
+    )
+    save_response(
+        submitted=submitted,
+        context_text=context_text,
+        answers=answers,
+        free_text=free_text,
+        send_to_line=send_to_line,
+        cloudinary_ready=cloudinary_ready,
+    )
     render_latest_result()
 
 

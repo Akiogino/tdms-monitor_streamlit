@@ -90,3 +90,35 @@ def build_score_report(
         f"【評価】\n"
         f"{''.join(evaluations)}"
     )
+
+
+def build_line_report_text(
+    created_at: str,
+    context_text: str,
+    free_text: str,
+    score_v: int,
+    score_s: int,
+    score_p: int,
+    score_a: int,
+) -> str:
+    """LINE送信用の短いレポート文を生成する。"""
+    context = context_text.strip() if context_text.strip() else "（未入力）"
+    memo = free_text.strip() if free_text.strip() else "（なし）"
+
+    comments = [
+        _score_phrase(score_v, "活性は高め。", "活性は低め。", "活性は中間。"),
+        _score_phrase(score_s, "安定は高め。", "安定は低め。", "安定は中間。"),
+        _score_phrase(score_p, "気分は快寄り。", "気分は不快寄り。", "気分はニュートラル。"),
+        _score_phrase(score_a, "覚醒は高め。", "覚醒は低め。", "覚醒は標準。"),
+    ]
+
+    timestamp = created_at[:16] if len(created_at) >= 16 else created_at
+
+    return (
+        "【二次元気分尺度】\n"
+        f"日時: {timestamp}\n"
+        f"状況: {context}\n"
+        f"メモ: {memo}\n"
+        f"V:{score_v} / S:{score_s} / P:{score_p} / A:{score_a}\n"
+        f"コメント: {' '.join(comments)}"
+    )
